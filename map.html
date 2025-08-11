@@ -134,7 +134,7 @@
 <!-- Leaflet JS -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 <!-- MarkerCluster -->
-<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 <!-- hls.js (only needed if you use .m3u8) -->
 <script src="https://cdn.jsdelivr.net/npm/hls.js@1"></script>
 
@@ -146,6 +146,13 @@ const TYPE_META = {
   detention: { label: 'Detention / Abduction',color: '#f59e0b' },
   protest:   { label: 'Protest / Demonstration', color: '#10b981' },
 };
+const DEFAULT_API = 'https://incidents-api.saree-ali28.workers.dev/api/incidents';
+async function loadFromUrl(url) {
+  const res = await fetch(url, { cache: 'no-store' });
+  if (!res.ok) throw new Error(res.status + ' ' + res.statusText);
+  const json = await res.json();
+  setIncidents(json);
+}
 
 // DATA SCHEMA (JSON array):
 // [
@@ -239,19 +246,20 @@ fetchBtn.addEventListener('click', async () => {
 });
 
 // Try to auto-load ./incidents.json if present
-(async function tryLoadDefaultJSON(){
-  try {
-    const res = await fetch('./incidents.json?cb=' + Date.now(), {cache:'no-store'});
-    if (res.ok) {
-      const json = await res.json();
-      setIncidents(json);
-      console.log('Loaded incidents.json');
-    } else {
-      console.log('incidents.json not found (using inline sample)');
-    }
-  } catch (e) {
-    console.log('No incidents.json (using inline sample)');
+(async function boot() {
+  const params = new URLSearchParams(location.search);
+  const api = params.get('api') || DEFAULT_API;
+
+  if (api) {
+    dataUrl.value = api;
+    try { await loadFromUrl(api); return; } catch (e) { console.log('API load failed:', e); }
   }
+  // Fallback to local file
+  try {
+    const res = await fetch('./incidents.json?cb=' + Date.now(), { cache: 'no-store' });
+    if (res.ok) { setIncidents(await res.json()); console.log('Loaded incidents.json'); return; }
+  } catch {}
+  console.log('No API/incidents.json found; using inline sample');
 })();
 
 // Markers registry
@@ -298,7 +306,7 @@ function makeMarker(inc) {
 
 function buildPopupHTML(inc) {
   const meta = TYPE_META[inc.type] || { label: inc.type || 'Other' };
-  const isHLS = inc.videoUrl && inc.videoUrl.endsWith('.m3u8');
+  const isHLS = inc.videoUrl && /\.m3u8(\?|$)/.test(inc.videoUrl);
   const videoAttrs = `playsinline muted controls preload="metadata" style="width:100%;height:auto;border-radius:10px;"`;
   const media = inc.videoUrl
     ? (isHLS ? `<video data-hls="1" data-src="${inc.videoUrl}" ${videoAttrs}></video>`
@@ -405,3 +413,4 @@ fitToResults();
 </script>
 </body>
 </html>
+
