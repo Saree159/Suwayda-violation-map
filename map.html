@@ -46,6 +46,10 @@
 
     /* Admin panel */
     #adminPanel { position:absolute; right:16px; top:80px; width:360px; background:#fff; border:1px solid #e5e7eb; border-radius:12px; box-shadow:0 10px 30px rgba(0,0,0,.08); padding:12px; display:none; z-index:5000; }
+      /* Content warning */
+  .cw { background:#111827; color:#fff; padding:12px; border-radius:10px; font-size:12px; }
+  .cw p { margin:0 0 8px; }
+  .media[hidden] { display:none !important; }
   </style>
 </head>
 <body>
@@ -289,7 +293,32 @@ function makeMarker(inc) {
   m.incident = inc;
   m.bindPopup(buildPopupHTML(inc), { maxWidth: 360 });
   m.on('popupopen', (e) => {
-    const root = e.popup.getElement();
+  const root = e.popup.getElement();
+
+  // If there is a content-warning, only load video after the user clicks
+  const revealBtn = root.querySelector('[data-reveal]');
+  if (revealBtn) {
+    revealBtn.addEventListener('click', () => {
+      const cw = root.querySelector('.cw');
+      const media = root.querySelector('.media');
+      if (cw && media) {
+        cw.remove();
+        media.hidden = false;
+        const vid = media.querySelector('video');
+        if (vid) {
+          if (vid.dataset.hls === '1' && window.Hls && window.Hls.isSupported()) {
+            const hls = new Hls();
+            hls.loadSource(vid.dataset.src);
+            hls.attachMedia(vid);
+            hls.on(Hls.Events.MANIFEST_PARSED, () => vid.play().catch(()=>{}));
+          } else {
+            vid.play().catch(()=>{});
+          }
+        }
+      }
+    }, { once: true });
+  } else {
+    // No warning – play immediately (muted)
     const vid = root.querySelector('video');
     if (vid) {
       if (vid.dataset.hls === '1' && window.Hls && window.Hls.isSupported()) {
@@ -297,10 +326,18 @@ function makeMarker(inc) {
         hls.loadSource(vid.dataset.src);
         hls.attachMedia(vid);
         hls.on(Hls.Events.MANIFEST_PARSED, () => vid.play().catch(()=>{}));
-      } else { vid.play().catch(()=>{}); }
+      } else {
+        vid.play().catch(()=>{});
+      }
     }
-  });
-  m.on('popupclose', (e) => { const vid = e.popup.getElement().querySelector('video'); if (vid) vid.pause(); });
+  }
+});
+
+m.on('popupclose', (e) => {
+  const root = e.popup.getElement();
+  const vid = root.querySelector('video');
+  if (vid) vid.pause();
+});
   return m;
 }
 
@@ -308,22 +345,40 @@ function buildPopupHTML(inc) {
   const meta = TYPE_META[inc.type] || { label: inc.type || 'Other' };
   const isHLS = inc.videoUrl && /\.m3u8(\?|$)/.test(inc.videoUrl);
   const videoAttrs = `playsinline muted controls preload="metadata" style="width:100%;height:auto;border-radius:10px;"`;
-  const media = inc.videoUrl
-    ? (isHLS ? `<video data-hls="1" data-src="${inc.videoUrl}" ${videoAttrs}></video>`
-             : `<video src="${inc.videoUrl}" ${videoAttrs}></video>`)
+  const mediaHTML = inc.videoUrl
+    ? (isHLS
+        ? `<video data-hls="1" data-src="${inc.videoUrl}" ${videoAttrs}></video>`
+        : `<video src="${inc.videoUrl}" ${videoAttrs}></video>`)
     : (inc.thumb ? `<img src="${inc.thumb}" alt="thumbnail"/>` : '');
+
+  // Show the warning for the most sensitive types; otherwise show media directly
+  const needsCW = inc.type === 'violence' || inc.type === 'detention';
+
   return `
     <div class="popup">
       <h3>${escapeHTML(inc.title)}</h3>
       <div class="meta">${inc.date} · <span style="color:${(TYPE_META[inc.type]||{}).color}">${meta.label}</span></div>
       <div class="thumb-wrap">
         ${inc.id ? `<span class="badge">${inc.id}</span>` : ''}
-        ${media}
+        ${needsCW ? `
+          <div class="cw">
+            <p>⚠️ תוכן רגיש: ייתכן שהווידאו מכיל אלימות/תמונות קשות.</p>
+            <button class="btn primary" data-reveal>הצג וידאו</button>
+          </div>
+          <div class="media" hidden>
+            ${mediaHTML}
+          </div>
+        ` : `
+          <div class="media">
+            ${mediaHTML}
+          </div>
+        `}
       </div>
       <div class="meta" style="margin-top:8px">Source: ${escapeHTML(inc.source||'—')} · Consent: ${inc.consent||'—'}</div>
       ${inc.notes ? `<div class="consent">${escapeHTML(inc.notes)}</div>` : ''}
     </div>`;
 }
+
 
 function escapeHTML(str='') { return str.replace(/[&<>\"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#039;'}[m])); }
 
@@ -413,4 +468,5 @@ fitToResults();
 </script>
 </body>
 </html>
+
 
