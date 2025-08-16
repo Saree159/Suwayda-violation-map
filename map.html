@@ -295,41 +295,33 @@ function makeMarker(inc) {
   m.on('popupopen', (e) => {
   const root = e.popup.getElement();
 
-  // If there is a content-warning, only load video after the user clicks
-  const revealBtn = root.querySelector('[data-reveal]');
-  if (revealBtn) {
-    revealBtn.addEventListener('click', () => {
-      const cw = root.querySelector('.cw');
-      const media = root.querySelector('.media');
-      if (cw && media) {
-        cw.remove();
-        media.hidden = false;
-        const vid = media.querySelector('video');
-        if (vid) {
-          if (vid.dataset.hls === '1' && window.Hls && window.Hls.isSupported()) {
-            const hls = new Hls();
-            hls.loadSource(vid.dataset.src);
-            hls.attachMedia(vid);
-            hls.on(Hls.Events.MANIFEST_PARSED, () => vid.play().catch(()=>{}));
-          } else {
-            vid.play().catch(()=>{});
-          }
-        }
-      }
-    }, { once: true });
-  } else {
-    // No warning – play immediately (muted)
+  const showMedia = () => {
+    const cw = root.querySelector('.cw');
+    const media = root.querySelector('.media');
+    if (cw && media) { cw.remove(); media.hidden = false; }
     const vid = root.querySelector('video');
     if (vid) {
-      if (vid.dataset.hls === '1' && window.Hls && window.Hls.isSupported()) {
-        const hls = new Hls();
-        hls.loadSource(vid.dataset.src);
-        hls.attachMedia(vid);
-        hls.on(Hls.Events.MANIFEST_PARSED, () => vid.play().catch(()=>{}));
-      } else {
-        vid.play().catch(()=>{});
-      }
+      try {
+        if (vid.dataset.hls === '1' && window.Hls && window.Hls.isSupported()) {
+          const hls = new Hls();
+          hls.loadSource(vid.dataset.src);
+          hls.attachMedia(vid);
+          hls.on(Hls.Events.MANIFEST_PARSED, () => vid.play().catch(()=>{}));
+        } else {
+          vid.play().catch(()=>{});
+        }
+      } catch (_) {}
     }
+  };
+
+  const reveal = root.querySelector('[data-reveal]');
+  if (reveal) {
+    const stop = ev => { ev.preventDefault(); ev.stopPropagation(); };
+    // Prevent map from seeing this click (which would close the popup)
+    reveal.addEventListener('pointerdown', stop);
+    reveal.addEventListener('click', (ev) => { stop(ev); showMedia(); }, { once: true });
+  } else {
+    showMedia();
   }
 });
 
@@ -338,6 +330,7 @@ m.on('popupclose', (e) => {
   const vid = root.querySelector('video');
   if (vid) vid.pause();
 });
+
   return m;
 }
 
@@ -468,5 +461,6 @@ fitToResults();
 </script>
 </body>
 </html>
+
 
 
