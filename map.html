@@ -344,7 +344,6 @@ function buildPopupHTML(inc) {
         : `<video src="${inc.videoUrl}" ${videoAttrs}></video>`)
     : (inc.thumb ? `<img src="${inc.thumb}" alt="thumbnail"/>` : '');
 
-  // Show the warning for the most sensitive types; otherwise show media directly
   const needsCW = inc.type === 'violence' || inc.type === 'detention';
 
   return `
@@ -356,7 +355,7 @@ function buildPopupHTML(inc) {
         ${needsCW ? `
           <div class="cw">
             <p>⚠️ תוכן רגיש: ייתכן שהווידאו מכיל אלימות/תמונות קשות.</p>
-            <button class="btn primary" data-reveal>הצג וידאו</button>
+            <button type="button" class="btn primary" data-reveal>הצג עוד</button>
           </div>
           <div class="media" hidden>
             ${mediaHTML}
@@ -371,7 +370,6 @@ function buildPopupHTML(inc) {
       ${inc.notes ? `<div class="consent">${escapeHTML(inc.notes)}</div>` : ''}
     </div>`;
 }
-
 
 function escapeHTML(str='') { return str.replace(/[&<>\"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#039;'}[m])); }
 
@@ -461,6 +459,7 @@ fitToResults();
 </script>
 </body>
 </html>
+
 
 
 
